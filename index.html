@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#081c19">
+  <title>RFFA Draft Room</title>
+  <link rel="stylesheet" href="styles.css?v=roster-view-1">
+</head>
+<body>
+  <div id="toastRegion" class="toast-region" aria-live="polite"></div>
+
+  <main id="setupView" class="setup-shell">
+    <header class="masthead">
+      <div class="brand-mark">R</div>
+      <div>
+        <p class="eyebrow">RFFA · 2026 PPR</p>
+        <h1>Build the board.<br><em>Own the room.</em></h1>
+      </div>
+      <div id="playerDataBadge" class="status-pill muted">Loading player pool…</div>
+    </header>
+
+    <section class="setup-grid">
+      <article class="panel setup-panel">
+        <div class="step-number">01</div>
+        <div class="panel-heading">
+          <p class="eyebrow">League source</p>
+          <h2>Bring in your ESPN teams</h2>
+          <p>Public leagues need only the league ID. Private leagues also need the two ESPN cookie values from a signed-in browser.</p>
+        </div>
+        <div class="form-grid">
+          <label>Season<input id="seasonInput" type="number" min="2020" value="2026"></label>
+          <label>League ID<input id="leagueIdInput" inputmode="numeric" placeholder="123456789"></label>
+          <details class="private-details full">
+            <summary>Private league credentials <span>optional</span></summary>
+            <div class="form-grid credentials">
+              <label>SWID<input id="swidInput" autocomplete="off" placeholder="{XXXXXXXX-…}"></label>
+              <label>espn_s2<input id="espnS2Input" type="password" autocomplete="off" placeholder="Long cookie value"></label>
+            </div>
+            <p class="field-note">These values go only to your local server and ESPN. They are never saved in the browser or written to disk.</p>
+          </details>
+        </div>
+        <div class="button-row">
+          <button id="loadLeagueBtn" class="button primary">Import ESPN teams</button>
+          <button id="manualTeamsBtn" class="button ghost">Use 12 manual teams</button>
+        </div>
+        <p id="leagueMessage" class="inline-message" aria-live="polite"></p>
+      </article>
+
+      <article class="panel setup-panel">
+        <div class="step-number">02</div>
+        <div class="panel-heading">
+          <p class="eyebrow">Draft order</p>
+          <h2>Set the room</h2>
+          <p>Use the arrows or drag teams into position. The draft snakes automatically.</p>
+        </div>
+        <div id="teamOrderEmpty" class="empty-state">Import your league to arrange its teams.</div>
+        <ol id="teamOrderList" class="team-order" aria-label="Draft order"></ol>
+        <label class="rounds-field">Rounds <input id="roundsInput" type="number" min="1" max="30" value="16"></label>
+      </article>
+
+      <article class="panel setup-panel sheets-panel">
+        <div class="step-number">03</div>
+        <div class="panel-heading">
+          <p class="eyebrow">Live backup</p>
+          <h2>Choose a Google Sheet</h2>
+          <p>Connect once, choose any Sheet you can edit, and every pick is mirrored to its own draft tab.</p>
+        </div>
+        <label>Google OAuth Client ID
+          <input id="googleClientIdInput" placeholder="…apps.googleusercontent.com" autocomplete="off">
+        </label>
+        <p class="field-note">Create a Web application client with <strong>http://localhost:8765</strong> as an authorized JavaScript origin. Enable Google Drive API and Google Sheets API.</p>
+        <div class="button-row">
+          <button id="connectGoogleBtn" class="button secondary">Connect Google</button>
+          <button id="createSheetBtn" class="button ghost" disabled>Create new Sheet</button>
+        </div>
+        <label>Draft spreadsheet
+          <select id="sheetSelect" disabled><option value="">Connect Google first</option></select>
+        </label>
+        <p id="googleMessage" class="inline-message" aria-live="polite"></p>
+      </article>
+    </section>
+
+    <section class="launch-panel">
+      <div>
+        <p class="eyebrow">Everything ready?</p>
+        <h2>There is no clock. There is only the next pick.</h2>
+        <p id="readinessText">Load player data and 12 teams to continue.</p>
+      </div>
+      <button id="startDraftBtn" class="button launch" disabled>Enter draft room <span>→</span></button>
+    </section>
+  </main>
+
+  <main id="draftView" class="draft-shell hidden">
+    <header class="draft-header">
+      <div class="compact-brand"><span>R</span><div><b>RFFA</b><small>Draft room</small></div></div>
+      <div class="on-clock">
+        <p id="pickLabel" class="eyebrow">Pick 1.01</p>
+        <h2 id="onClockTeam">Team 1 is on the clock</h2>
+        <p>No timer · take the room at your pace</p>
+      </div>
+      <div class="draft-actions">
+        <span id="syncStatus" class="sync-status local">Saved locally</span>
+        <button id="displayModeBtn" class="icon-button display-mode-button" type="button" title="Switch display theme">☾ <span>Dark display</span></button>
+        <button id="rosterViewBtn" class="icon-button roster-view-button" type="button" title="View all team rosters (Shift+R)" aria-haspopup="dialog">▦ <span>Rosters</span></button>
+        <button id="undoBtn" class="icon-button" title="Undo last pick" disabled>↶ <span>Undo</span></button>
+        <button id="exportBtn" class="icon-button" title="Export CSV">⇩ <span>CSV</span></button>
+        <button id="exitDraftBtn" class="icon-button" title="Back to setup">⚙ <span>Setup</span></button>
+      </div>
+    </header>
+
+    <section class="draft-order-strip" aria-label="Upcoming picks">
+      <div id="upcomingPicks" class="upcoming-picks"></div>
+    </section>
+
+    <div class="draft-layout">
+      <section class="draft-board-section">
+        <div class="section-header board-heading">
+          <div><p class="eyebrow">Every selection</p><h2>Draft board <span id="boardPickCount"></span></h2></div>
+          <div class="board-tools">
+            <div class="board-legend" aria-label="Position colors">
+              <span class="legend-QB">QB</span><span class="legend-RB">RB</span><span class="legend-WR">WR</span>
+              <span class="legend-TE">TE</span><span class="legend-K">K</span><span class="legend-DST">D/ST</span>
+            </div>
+            <button id="toggleBoardFullscreen" class="board-fullscreen-btn" type="button" aria-label="Show draft board full screen"><span>⛶</span> Full screen</button>
+          </div>
+        </div>
+        <div id="draftBoardScroll" class="draft-board-scroll">
+          <div id="draftBoard" class="draft-board" aria-label="Draft selections by round and team"></div>
+        </div>
+        <div id="boardCardPreview" class="board-card-preview" aria-hidden="true"></div>
+      </section>
+
+      <aside class="available-section">
+        <div class="section-header">
+          <div><p class="eyebrow">Player pool</p><h2>Available players <span id="availableCount"></span></h2></div>
+          <div class="filters">
+            <label class="search-box"><span>⌕</span><input id="playerSearch" type="search" placeholder="Search player or team"></label>
+            <div id="positionFilters" class="position-filters"></div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="player-table">
+            <thead><tr><th>RK</th><th>Player</th><th>POS</th><th></th></tr></thead>
+            <tbody id="playerTableBody"></tbody>
+          </table>
+        </div>
+      </aside>
+    </div>
+
+    <section id="rosterView" class="roster-view hidden" role="dialog" aria-modal="true" aria-labelledby="rosterViewTitle">
+      <header class="roster-view-header">
+        <div>
+          <p class="eyebrow">League overview</p>
+          <h2 id="rosterViewTitle">Team rosters <span id="rosterPickCount"></span></h2>
+          <p>Players fill their first matching starter slot, then FLEX, then bench.</p>
+        </div>
+        <div class="roster-view-actions">
+          <span><kbd>Shift</kbd> + <kbd>R</kbd> to toggle · <kbd>Esc</kbd> to close</span>
+          <button id="closeRosterViewBtn" class="roster-close-button" type="button" aria-label="Close roster view">✕ <span>Back to draft</span></button>
+        </div>
+      </header>
+      <div id="rosterGrid" class="roster-grid" aria-label="All team rosters"></div>
+    </section>
+  </main>
+
+  <dialog id="confirmDialog" class="confirm-dialog">
+    <form method="dialog">
+      <button class="dialog-close" value="cancel" aria-label="Close">×</button>
+      <p class="eyebrow">Confirm selection</p>
+      <div id="confirmPlayer" class="confirm-player"></div>
+      <p id="confirmTeam" class="confirm-team"></p>
+      <div class="button-row">
+        <button value="cancel" class="button ghost">Not yet</button>
+        <button id="confirmPickBtn" value="default" class="button primary">Make the pick</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="app.js?v=roster-view-1"></script>
+</body>
+</html>
